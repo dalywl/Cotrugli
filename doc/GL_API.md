@@ -58,7 +58,7 @@ the name will be used in preparing reports
 
 use `ctrgl_company_post` to add or change company information. viz.:
 
-```      sql_handle ctrgl_company_post 'Newco' 'New Company, Inc.'
+```      sql_handle ctrgl_company_post 'Newco' 'New Company, Inc.'```
 
 Journal
 -------
@@ -142,24 +142,14 @@ or 'c' for credit.
 
 These two flags should therefore be set as follows 
 
-<table><tr>
-<tc>Accounting Equation </tc><tc> acct_type </tc><tc> sign_type </tc>
-</tr>
-<tc> --- </tc><tc> :-: </tc><tc> :-: </tc>
-</tr>
-<tc>Asset               </tc><tc> b         </tc><tc> d         </tc>
-</tr>
-<tc>Liability           </tc><tc> b         </tc><tc> c         </tc>
-</tr>
-<tc>Equity              </tc><tc> b         </tc><tc> c         </tc>
-</tr>
-<tc>Retained earnings   </tc><tc> r         </tc><tc> c         </tc>
-</tr>
-<tc>Revenue             </tc><tc> i         </tc><tc> c         </tc>
-</tr>
-<tc>Expense             </tc><tc> i         </tc><tc> d         </tc>
-</tr>
-</table>
+|Accounting Equation | acct_type | sign_type |
+| --- | :-: | :-: |
+|Asset               | b         | d         |
+|Liability           | b         | c         |
+|Equity              | b         | c         |
+|Retained earnings   | r         | c         |
+|Revenue             | i         | c         |
+|Expense             | i         | d         |
 
 Use `ctrgl_open_chart` to display the chart of accounts
 
@@ -167,7 +157,7 @@ Use `ctrgl_open_chart` to display the chart of accounts
 
 use `ctrgl_chart_post` to add or change an account:
 
-```      sql_handle ctrgl_chart_post 'company' 'acct number' 'title' 'acct type' 'sign type'
+```      sql_handle ctrgl_chart_post 'company' 'acct number' 'title' 'acct type' 'sign type'```
 
 'company' is a company code in the company table.  'acct number' is
 the key to the chart.  Acct type and sign type are discussed above.
