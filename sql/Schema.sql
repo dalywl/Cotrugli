@@ -18,6 +18,237 @@ COMMENT ON EXTENSION plpgsql IS 'PL/pgSQL procedural language';
 
 
 --
+-- Name: accounts; Type: TABLE; Schema: public; Owner: dalyw; Tablespace: 
+--
+
+CREATE TABLE accounts (
+    company character(20) NOT NULL,
+    acct_no character(20) NOT NULL,
+    title character varying(255) DEFAULT NULL::character varying,
+    acct_type character(1) DEFAULT NULL::bpchar,
+    sign_type character(1) DEFAULT NULL::bpchar,
+    created date,
+    last_update date
+);
+
+
+ALTER TABLE public.accounts OWNER TO dalyw;
+
+--
+-- Name: doc_lines; Type: TABLE; Schema: public; Owner: dalyw; Tablespace: 
+--
+
+CREATE TABLE doc_lines (
+    doc_id integer NOT NULL,
+    line_no integer,
+    acct_no character(20) DEFAULT NULL::bpchar,
+    debit numeric(14,2) DEFAULT NULL::numeric,
+    credit numeric(14,2) DEFAULT NULL::numeric,
+    company character(20) NOT NULL,
+    created date,
+    last_update date
+);
+
+
+ALTER TABLE public.doc_lines OWNER TO dalyw;
+
+--
+-- Name: document; Type: TABLE; Schema: public; Owner: dalyw; Tablespace: 
+--
+
+CREATE TABLE document (
+    doc_id integer NOT NULL,
+    company character(20) NOT NULL,
+    journal character(20) NOT NULL,
+    name character(50) NOT NULL,
+    doc_date date NOT NULL,
+    description character varying(4096) DEFAULT NULL::character varying,
+    period character(10),
+    created date,
+    last_update date
+);
+
+
+ALTER TABLE public.document OWNER TO dalyw;
+
+--
+-- Name: docs; Type: VIEW; Schema: public; Owner: dalyw
+--
+
+CREATE VIEW docs AS
+    SELECT btrim((document.company)::text) AS co, btrim((document.journal)::text) AS jrnl, btrim((document.name)::text) AS doc, document.doc_date, document.period, btrim((doc_lines.acct_no)::text) AS acct, document.description, doc_lines.debit, doc_lines.credit FROM (document JOIN doc_lines ON ((document.doc_id = doc_lines.doc_id)));
+
+
+ALTER TABLE public.docs OWNER TO dalyw;
+
+--
+-- Name: acct_detail; Type: VIEW; Schema: public; Owner: dalyw
+--
+
+CREATE VIEW acct_detail AS
+    SELECT accounts.company, accounts.acct_no, accounts.title, docs.doc, docs.doc_date, docs.period, docs.description, docs.debit, docs.credit FROM (accounts LEFT JOIN docs ON ((((accounts.company)::text = docs.co) AND ((accounts.acct_no)::text = docs.acct))));
+
+
+ALTER TABLE public.acct_detail OWNER TO dalyw;
+
+--
+-- Name: acct_type; Type: TABLE; Schema: public; Owner: dalyw; Tablespace: 
+--
+
+CREATE TABLE acct_type (
+    line integer,
+    code character(1),
+    short character(10),
+    long character(255),
+    created date,
+    last_update date
+);
+
+
+ALTER TABLE public.acct_type OWNER TO dalyw;
+
+--
+-- Name: accts; Type: VIEW; Schema: public; Owner: dalyw
+--
+
+CREATE VIEW accts AS
+    SELECT btrim((accounts.company)::text) AS co, btrim((accounts.acct_no)::text) AS acct, accounts.title, accounts.acct_type, accounts.sign_type FROM accounts ORDER BY accounts.acct_no;
+
+
+ALTER TABLE public.accts OWNER TO dalyw;
+
+--
+-- Name: balance_type; Type: TABLE; Schema: public; Owner: dalyw; Tablespace: 
+--
+
+CREATE TABLE balance_type (
+    line integer,
+    code character(1),
+    short character(10),
+    long character(255)
+);
+
+
+ALTER TABLE public.balance_type OWNER TO dalyw;
+
+--
+-- Name: company; Type: TABLE; Schema: public; Owner: dalyw; Tablespace: 
+--
+
+CREATE TABLE company (
+    company character(20) NOT NULL,
+    coname character varying(50) DEFAULT NULL::character varying,
+    addr character varying(4096) DEFAULT NULL::character varying,
+    city character varying(50) DEFAULT NULL::character varying,
+    state character varying(10) DEFAULT NULL::character varying,
+    zip character varying(20) DEFAULT NULL::character varying,
+    fein character varying(10) DEFAULT NULL::character varying,
+    current_period character(10) DEFAULT NULL::bpchar,
+    created date,
+    last_update date
+);
+
+
+ALTER TABLE public.company OWNER TO dalyw;
+
+--
+-- Name: config; Type: TABLE; Schema: public; Owner: dalyw; Tablespace: 
+--
+
+CREATE TABLE config (
+    name character(50) NOT NULL,
+    value character varying(255) DEFAULT NULL::character varying,
+    created date,
+    last_update date
+);
+
+
+ALTER TABLE public.config OWNER TO dalyw;
+
+--
+-- Name: periods; Type: TABLE; Schema: public; Owner: dalyw; Tablespace: 
+--
+
+CREATE TABLE periods (
+    company character(20) NOT NULL,
+    period character(10) NOT NULL,
+    begin_date date NOT NULL,
+    end_date date NOT NULL,
+    created date,
+    last_update date
+);
+
+
+ALTER TABLE public.periods OWNER TO dalyw;
+
+--
+-- Name: current_period; Type: VIEW; Schema: public; Owner: dalyw
+--
+
+CREATE VIEW current_period AS
+    SELECT company.company, company.coname, periods.end_date FROM (company JOIN periods ON (((company.company = periods.company) AND (company.current_period = periods.period))));
+
+
+ALTER TABLE public.current_period OWNER TO dalyw;
+
+--
+-- Name: document_doc_id_seq; Type: SEQUENCE; Schema: public; Owner: dalyw
+--
+
+CREATE SEQUENCE document_doc_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.document_doc_id_seq OWNER TO dalyw;
+
+--
+-- Name: document_doc_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: dalyw
+--
+
+ALTER SEQUENCE document_doc_id_seq OWNED BY document.doc_id;
+
+
+--
+-- Name: tb; Type: VIEW; Schema: public; Owner: dalyw
+--
+
+CREATE VIEW tb AS
+    SELECT btrim((accounts.company)::text) AS co, btrim((accounts.acct_no)::text) AS acct, docs.period, sum(docs.debit) AS dr, sum(docs.credit) AS cr FROM (accounts LEFT JOIN docs ON ((((accounts.company)::text = docs.co) AND ((accounts.acct_no)::text = docs.acct)))) GROUP BY accounts.company, accounts.acct_no, docs.period;
+
+
+ALTER TABLE public.tb OWNER TO dalyw;
+
+--
+-- Name: journal; Type: TABLE; Schema: public; Owner: dalyw; Tablespace: 
+--
+
+CREATE TABLE journal (
+    jrnl character(10) NOT NULL,
+    title character varying(255) DEFAULT NULL::character varying
+);
+
+
+ALTER TABLE public.journal OWNER TO dalyw;
+
+--
+-- Name: sign_type; Type: TABLE; Schema: public; Owner: dalyw; Tablespace: 
+--
+
+CREATE TABLE sign_type (
+    line integer,
+    code character(1),
+    short character varying(10),
+    long character varying(255)
+);
+
+
+ALTER TABLE public.sign_type OWNER TO dalyw;
+
+--
 -- Name: account(character varying, character varying, character varying); Type: FUNCTION; Schema: public; Owner: dalyw
 --
 
@@ -219,124 +450,6 @@ $$;
 
 ALTER FUNCTION public.ts_trigger() OWNER TO dalyw;
 
-SET default_tablespace = '';
-
-SET default_with_oids = false;
-
---
--- Name: accounts; Type: TABLE; Schema: public; Owner: dalyw; Tablespace: 
---
-
-CREATE TABLE accounts (
-    company character(20) NOT NULL,
-    acct_no character(20) NOT NULL,
-    title character varying(255) DEFAULT NULL::character varying,
-    acct_type character(1) DEFAULT NULL::bpchar,
-    sign_type character(1) DEFAULT NULL::bpchar,
-    created date,
-    last_update date
-);
-
-
-ALTER TABLE public.accounts OWNER TO dalyw;
-
---
--- Name: doc_lines; Type: TABLE; Schema: public; Owner: dalyw; Tablespace: 
---
-
-CREATE TABLE doc_lines (
-    doc_id integer NOT NULL,
-    line_no integer,
-    acct_no character(20) DEFAULT NULL::bpchar,
-    debit numeric(14,2) DEFAULT NULL::numeric,
-    credit numeric(14,2) DEFAULT NULL::numeric,
-    company character(20) NOT NULL,
-    created date,
-    last_update date
-);
-
-
-ALTER TABLE public.doc_lines OWNER TO dalyw;
-
---
--- Name: document; Type: TABLE; Schema: public; Owner: dalyw; Tablespace: 
---
-
-CREATE TABLE document (
-    doc_id integer NOT NULL,
-    company character(20) NOT NULL,
-    journal character(20) NOT NULL,
-    name character(50) NOT NULL,
-    doc_date date NOT NULL,
-    description character varying(4096) DEFAULT NULL::character varying,
-    period character(10),
-    created date,
-    last_update date
-);
-
-
-ALTER TABLE public.document OWNER TO dalyw;
-
---
--- Name: docs; Type: VIEW; Schema: public; Owner: dalyw
---
-
-CREATE VIEW docs AS
-    SELECT btrim((document.company)::text) AS co, btrim((document.journal)::text) AS jrnl, btrim((document.name)::text) AS doc, document.doc_date, document.period, btrim((doc_lines.acct_no)::text) AS acct, document.description, doc_lines.debit, doc_lines.credit FROM (document JOIN doc_lines ON ((document.doc_id = doc_lines.doc_id)));
-
-
-ALTER TABLE public.docs OWNER TO dalyw;
-
---
--- Name: acct_detail; Type: VIEW; Schema: public; Owner: dalyw
---
-
-CREATE VIEW acct_detail AS
-    SELECT accounts.company, accounts.acct_no, accounts.title, docs.doc, docs.doc_date, docs.period, docs.description, docs.debit, docs.credit FROM (accounts LEFT JOIN docs ON ((((accounts.company)::text = docs.co) AND ((accounts.acct_no)::text = docs.acct))));
-
-
-ALTER TABLE public.acct_detail OWNER TO dalyw;
-
---
--- Name: acct_type; Type: TABLE; Schema: public; Owner: dalyw; Tablespace: 
---
-
-CREATE TABLE acct_type (
-    line integer,
-    code character(1),
-    short character(10),
-    long character(255),
-    created date,
-    last_update date
-);
-
-
-ALTER TABLE public.acct_type OWNER TO dalyw;
-
---
--- Name: accts; Type: VIEW; Schema: public; Owner: dalyw
---
-
-CREATE VIEW accts AS
-    SELECT btrim((accounts.company)::text) AS co, btrim((accounts.acct_no)::text) AS acct, accounts.title, accounts.acct_type, accounts.sign_type FROM accounts ORDER BY accounts.acct_no;
-
-
-ALTER TABLE public.accts OWNER TO dalyw;
-
---
--- Name: balance_type; Type: TABLE; Schema: public; Owner: dalyw; Tablespace: 
---
-
-CREATE TABLE balance_type (
-    line integer,
-    code character(1),
-    short character(10),
-    long character(255)
-);
-
-
-ALTER TABLE public.balance_type OWNER TO dalyw;
-
 --
 -- Name: begining_trans; Type: VIEW; Schema: public; Owner: dalyw
 --
@@ -348,123 +461,6 @@ CREATE VIEW begining_trans AS
 ALTER TABLE public.begining_trans OWNER TO dalyw;
 
 --
--- Name: company; Type: TABLE; Schema: public; Owner: dalyw; Tablespace: 
---
-
-CREATE TABLE company (
-    company character(20) NOT NULL,
-    coname character varying(50) DEFAULT NULL::character varying,
-    addr character varying(4096) DEFAULT NULL::character varying,
-    city character varying(50) DEFAULT NULL::character varying,
-    state character varying(10) DEFAULT NULL::character varying,
-    zip character varying(20) DEFAULT NULL::character varying,
-    fein character varying(10) DEFAULT NULL::character varying,
-    current_period character(10) DEFAULT NULL::bpchar,
-    created date,
-    last_update date
-);
-
-
-ALTER TABLE public.company OWNER TO dalyw;
-
---
--- Name: config; Type: TABLE; Schema: public; Owner: dalyw; Tablespace: 
---
-
-CREATE TABLE config (
-    name character(50) NOT NULL,
-    value character varying(255) DEFAULT NULL::character varying,
-    created date,
-    last_update date
-);
-
-
-ALTER TABLE public.config OWNER TO dalyw;
-
---
--- Name: periods; Type: TABLE; Schema: public; Owner: dalyw; Tablespace: 
---
-
-CREATE TABLE periods (
-    company character(20) NOT NULL,
-    period character(10) NOT NULL,
-    begin_date date NOT NULL,
-    end_date date NOT NULL,
-    created date,
-    last_update date
-);
-
-
-ALTER TABLE public.periods OWNER TO dalyw;
-
---
--- Name: current_period; Type: VIEW; Schema: public; Owner: dalyw
---
-
-CREATE VIEW current_period AS
-    SELECT company.company, company.coname, periods.end_date FROM (company JOIN periods ON (((company.company = periods.company) AND (company.current_period = periods.period))));
-
-
-ALTER TABLE public.current_period OWNER TO dalyw;
-
---
--- Name: document_doc_id_seq; Type: SEQUENCE; Schema: public; Owner: dalyw
---
-
-CREATE SEQUENCE document_doc_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER TABLE public.document_doc_id_seq OWNER TO dalyw;
-
---
--- Name: document_doc_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: dalyw
---
-
-ALTER SEQUENCE document_doc_id_seq OWNED BY document.doc_id;
-
-
---
--- Name: tb; Type: VIEW; Schema: public; Owner: dalyw
---
-
-CREATE VIEW tb AS
-    SELECT btrim((accounts.company)::text) AS co, btrim((accounts.acct_no)::text) AS acct, docs.period, sum(docs.debit) AS dr, sum(docs.credit) AS cr FROM (accounts LEFT JOIN docs ON ((((accounts.company)::text = docs.co) AND ((accounts.acct_no)::text = docs.acct)))) GROUP BY accounts.company, accounts.acct_no, docs.period;
-
-
-ALTER TABLE public.tb OWNER TO dalyw;
-
---
--- Name: journal; Type: TABLE; Schema: public; Owner: dalyw; Tablespace: 
---
-
-CREATE TABLE journal (
-    jrnl character(10) NOT NULL,
-    title character varying(255) DEFAULT NULL::character varying
-);
-
-
-ALTER TABLE public.journal OWNER TO dalyw;
-
---
--- Name: sign_type; Type: TABLE; Schema: public; Owner: dalyw; Tablespace: 
---
-
-CREATE TABLE sign_type (
-    line integer,
-    code character(1),
-    short character varying(10),
-    long character varying(255)
-);
-
-
-ALTER TABLE public.sign_type OWNER TO dalyw;
-
---
 -- Name: tb_as_entered; Type: VIEW; Schema: public; Owner: dalyw
 --
 
@@ -473,6 +469,10 @@ CREATE VIEW tb_as_entered AS
 
 
 ALTER TABLE public.tb_as_entered OWNER TO dalyw;
+
+-- SET default_tablespace = '';
+
+-- SET default_with_oids = false;
 
 --
 -- Data for Name: acct_type; Type: TABLE DATA; Schema: public; Owner: dalyw
@@ -492,24 +492,6 @@ COPY acct_type (line, code, short, long, created, last_update) FROM stdin;
 COPY balance_type (line, code, short, long) FROM stdin;
 1	d	Dr        	Debit balance                                                                                                                                                                                                                                                  
 2	c	Cr        	Credit balance                                                                                                                                                                                                                                                 
-\.
-
-
---
--- Data for Name: config; Type: TABLE DATA; Schema: public; Owner: dalyw
---
-
-COPY config (name, value, created, last_update) FROM stdin;
-period_span                                       	270	2014-02-20	2014-02-20
-docLines                                          	10	2014-02-20	2014-02-20
-begin_document                                    	BEG_BAL	2014-02-20	2014-02-20
-begin_journal                                     	gj	2014-02-20	2014-02-20
-parent                                            	Daly Web & Edit, Inc.	2014-02-20	2014-02-20
-tbLines                                           	30	2014-02-20	2014-02-20
-begin_desc                                        	Begining trial balance.	2014-02-20	2014-02-20
-groupLines                                        	30	2014-02-20	2014-02-20
-stylesheet                                        	/webtbstyle/WebTB.css	2014-02-20	2014-08-02
-document_root                                     	/webtb	2014-02-20	2014-08-02
 \.
 
 

@@ -181,7 +181,7 @@
   ⍝ Function to post a name -- value pair to the config table.
   name←1⊃args ◊ value←2⊃args
   cmd←'SELECT trim(name) FROM config WHERE name = ?'
-  →(1=1↑⍴rs←cmd SQL∆Select[handle] name)/replace
+  →(1=1↑⍴rs←cmd SQL∆Select[handle] ⊂name)/replace
 insert:
   cmd←'INSERT INTO config (name,value) VALUES (?,?)'
   cmd SQL∆Exec[handle] name value

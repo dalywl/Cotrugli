@@ -1,0 +1,279 @@
+#title Cotrugli Setup
+#author Bill Daly
+#date 2021-07-05
+
+* Summary
+
+Cotrugli is setup seven step process:
+
+ 1. Create the database - use psql
+ 2. Setup the configuration table
+ 3. Setup a company 
+ 4. Setup journals.  There must be at least one.
+ 5. Setup Periods
+ 6. Setup the Chart of Accounts
+ 7. Enter the begining balances
+
+* Create database
+
+Set up the database.  I used psql which ships with postgresql. One
+must create the database and then create the tables, views, and
+functions for cotrugli.  A script Cotrugli/sql/Schema.sql will do the
+heavy lifting. viz.:
+
+<example>
+psql
+psql (11.12 (Debian 11.12-0+deb10u1))
+Type "help" for help.
+
+dalyw=> CREATE DATABASE cotrugli;
+
+dalyw=>\i /home/dalyw/Cotrugli/sql/Schema.sql
+psql:/home/dalyw/Cotrugli/sql/Schema.sql:10: NOTICE:  extension "plpgsql" already exists, skipping
+CREATE EXTENSION
+psql:/home/dalyw/Cotrugli/sql/Schema.sql:17: ERROR:  must be owner of extension plpgsql
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE VIEW
+ALTER TABLE
+CREATE VIEW
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE VIEW
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE VIEW
+ALTER TABLE
+CREATE SEQUENCE
+ALTER TABLE
+ALTER SEQUENCE
+CREATE VIEW
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE FUNCTION
+ALTER FUNCTION
+CREATE FUNCTION
+ALTER FUNCTION
+CREATE FUNCTION
+ALTER FUNCTION
+CREATE FUNCTION
+ALTER FUNCTION
+CREATE FUNCTION
+ALTER FUNCTION
+CREATE FUNCTION
+ALTER FUNCTION
+CREATE FUNCTION
+ALTER FUNCTION
+CREATE FUNCTION
+ALTER FUNCTION
+CREATE FUNCTION
+ALTER FUNCTION
+CREATE FUNCTION
+ALTER FUNCTION
+CREATE VIEW
+ALTER TABLE
+CREATE VIEW
+ALTER TABLE
+COPY 3
+COPY 2
+COPY 2
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+dalyw=> \q
+</example>
+
+One the basic structure of the database exists we use GNU APL for the
+remainder of the setup.  Workspace setup.apl contains all the function
+calls for our Example Company.
+
+
+* Setup the configuration table
+
+The configuration table stores certain global parameters used
+throughout the system.
+
+accountFormat :: The character string to be used as the left argument to
+                 <code>⍕</code> when printing an acount number.
+
+balanceFormat :: The character string used for printing a debit or
+                 credit, whether a balance (a computed number) or and
+                 entry (pulled from the database).
+
+begin_document :: The name of the document which sets up the starting
+                  balance for the period in each account
+
+begin_journal :: The journal of the begin_document
+
+begin_desc :: The description of the begin_document
+
+use funtion <code>ctrgl_config_post</code> to create these items.
+
+<example>
+database_handle ctrgl_config_post 'accountFormat' '0000'
+database_handle ctrgl_config_post 'balanceFormat' '555,555,510'
+database_handle ctrgl_config_post 'begin_desc'     'Begining trial balance.'
+database_handle ctrgl_config_post 'begin_document' 'BEG_BAL'
+database_handle ctrgl_config_post 'begin_journal' 'gj'
+</example>
+ 
+* Setup a company
+
+A company is defined by its code and Full name. Use
+<code>ctrgl_compan_post</code>.
+
+<example>
+      database_handle ctrgl_company_post 'ex' 'Example Co. LLC'
+</example>
+
+* Setup journals.
+
+There must be at least one.  I use the code 'gj' for the General
+Journal. Every document must have a journal so use something simple.
+
+<code>ctrgl_jrnl_post</code> creates or admends a line in the journal
+table.
+
+<example>
+      database_handle ctrgl_jrnl_post 'gj' 'General Journal'
+</example>
+
+* Setup Periods
+
+Every transaction is assigned to a period.  I like to setup a fiscal
+year at a time and to use the year and a number for the period code.
+The period table has fours fields the company code, period code, its
+start date and its end date.
+
+Use <code>ctrgl_period_post</code>.
+
+<example>
+cth ctrgl_period_post 'ex' '2021-01' '01/01/2021' '03/31/2021'
+cth ctrgl_period_post 'ex' '2021-02' '04/01/2021' '06/30/2021'
+cth ctrgl_period_post 'ex' '2021-03' '07/01/2021' '09/30/2021'
+cth ctrgl_period_post 'ex' '2021-04' '10/01/2021' '12/31/2021'
+</example>
+
+* Setup the Chart of Accounts
+
+An account has four attributes: Account number, account title,account
+type, and sign type.
+
+The account type is one of 'b', 'r', 'i':
+
+b :: Balance sheet account
+r :: Retained earnngs account.  There should be only one.
+i :: Inccome account
+
+The Sign type indicates whether debits or credits are positive in
+presentation.
+
+d :: debits are positive
+c :: credits are positive
+
+<code>ctrgl_chart_post</code> will create or admend an account in the
+chart.
+
+<example>
+database_handle ctrgl_chart_post 'ex' '1010' 'Cash' 'b' 'd'
+database_handle ctrgl_chart_post 'ex' '2710' 'Long-term debt' 'b' 'c'
+database_handle ctrgl_chart_post 'ex' '5010' 'Sales' 'i' 'c'
+database_handle ctrgl_chart_post 'ex' '7010' 'Salaries and wages' 'i' 'd'
+database_handle ctrgl_chart_post 'ex' '3990' 'Retained Earnings' 'r' 'c'
+</example>
+
+* Enter the begining balances
+
+Begining balances are entered like any other transaction as a
+document. A document is a complex structure and entry is done in
+several steps.
+
+First create the document using <code>ctrgl_doc_init</code>. Second
+Enter the individual lines with <code>ctrgl_doc_debit</code> and
+<code>ctrgl_doc_credit</code>.
+
+<example>
+      begin ← ctrgl_doc_init 'ex' 'gj' 'begin' '1/1/2021' 'To record opening balances' '2021-01'
+
+      begin←begin ctrgl_doc_debit 1010 45000
+      begin←begin ctrgl_doc_debit 1410 2500
+      begin←begin ctrgl_doc_debit 1510 1300000
+      begin←begin ctrgl_doc_debit 1520 755000
+      begin←begin ctrgl_doc_credit 1590 140400
+      begin←begin ctrgl_doc_credit 2110 41750
+      begin←begin ctrgl_doc_credit 2710 1644000
+      begin←begin ctrgl_doc_credit 3100 1000
+      begin←begin ctrgl_doc_credit 3990 275350
+</example>
+
+To confirm that the document is correct use
+<code>ctrgl_doc_show</code>.
+
+<example>
+<example>
+      )load 2 cotrugli
+DUMPED 2021-06-30  14:43:35 (GMT-4) 
+DUMPED 2021-04-17  16:55:50 (GMT-4) 
+DUMPED 2021-03-07  18:06:05 (GMT-4) 
+DUMPED 2021-02-13  10:32:21 (GMT-4) 
+DUMPED 2021-01-13  16:05:56 (GMT-4) 
+DUMPED 2021-01-13  16:05:56 (GMT-4) 
+DUMPED 2021-02-13  10:32:21 (GMT-4) 
+DUMPED 2021-01-13  16:05:56 (GMT-4) 
+DUMPED 2021-02-14  20:59:48 (GMT-4) 
+DUMPED 2021-01-13  16:05:56 (GMT-4) 
+DUMPED 2021-02-13  10:32:21 (GMT-4) 
+ html∆a html∆b html∆blockquote html∆body html∆caption html∆cite html∆div html∆em
+       html∆footer html∆h1 html∆h2 html∆h3 html∆h4 html∆h5 html∆head html∆header
+       html∆hr html∆html html∆i html∆li html∆link html∆nav html∆p html∆pre html∆
+      span html∆strong html∆style html∆td html∆th html∆thead html∆tr html∆title
+      html∆table html∆thead html∆colgroup 
+ html∆br html∆hr html∆meta html∆col 
+DUMPED 2021-02-15  12:43:52 (GMT-4) 
+DUMPED 2021-01-13  16:05:56 (GMT-4) 
+DUMPED 2021-02-13  10:32:21 (GMT-4) 
+DUMPED 2021-04-17  14:47:31 (GMT-4) 
+DUMPED 2021-02-13  10:32:21 (GMT-4) 
+DUMPED 2021-01-13  16:05:56 (GMT-4) 
+      
+      )copy 2 setup.apl
+DUMPED 2021-07-01  16:49:18 (GMT-4) 
+      ⍞←wp∆txt∆assemble database_handle ctrgl_open_tb 'ex' '2021-01'
+                                       ex                             TB-2021-01
+                                 Trial Balance                            dalyw
+                                    2021-01                          07/05/2021
+
+Acct No Title                    Debit       Credit      A Type S Type
+1010    Cash                          45,000           0 b      d     
+1410    Prepaid expense                2,500           0 b      d     
+1510    Plant                      1,300,000           0 b      d     
+1520    Equipment                    755,000           0 b      d     
+1590    Accumulated Depreciation           0     140,400 b      d     
+2110    Accounts payable                   0      41,750 b      c     
+2710    Long-term debt                     0   1,644,000 b      c     
+3100    Common Stock                       0       1,000 b      c     
+3990    Retained Earnings                  0     275,350 r      c     
+
+      
+      ctrgl_sql_disconnect database_handle
+</example>
+
+* How to write the setup workspace
