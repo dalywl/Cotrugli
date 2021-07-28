@@ -1,0 +1,25 @@
+#title API for Cotrugli Journals
+#author Bill Daly
+#date 2021-07-13
+
+* Summary
+
+* What is a journal
+
+In traditional hand -- posted bookkeeping systems a journal was a book
+containing entries into the system in date order. Most journals were
+used for high volume transaction cycles and provided a means of
+summarizing entries over an accounting period.  There was always a
+General Journal for infrequent entries and adjustments.
+
+Data was copied from the journal into detailed subsidiary ledgers like
+accounts payable and accounts receivable and into the general ledger,
+usually is summary form.
+
+In modern computerized systems different programs are used for each
+transaction cycle to reflect the nature of each cycle.  The journal,
+now an attribute of a transaction, is used to prepare lists of similar
+transactions and a report is available to display these lists.
+
+
+

@@ -1,0 +1,9 @@
+#title  Cotrugli Features
+#author Bill Daly
+#date 2021-07-07
+
+ 1. Use the power of GNU APL to analyze your financial data
+ 2. Tailor Cotrugli to you specific needs.
+ 3. Simple API can be used as a command based accounting system.
+
+
