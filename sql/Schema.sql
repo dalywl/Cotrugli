@@ -174,6 +174,7 @@ CREATE TABLE periods (
     period character(10) NOT NULL,
     begin_date date NOT NULL,
     end_date date NOT NULL,
+    year_end boolean,
     created date,
     last_update date
 );

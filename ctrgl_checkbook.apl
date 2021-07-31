@@ -104,9 +104,10 @@
   ln←1 0 1 1 1 1 0 1\,cmd SQL∆Select[handle] args
 ∇  
 
-∇data←acct_no ctrgl_chk_book_data doc_list
+∇data←acct_no ctrgl_chk_book_data doc_list;widths;max
   ⍝ Function creates a checkbook array from a list of documents
-  data←⊃(⊂acct_no) ctrgl_chk_book_line ¨ doc_list
+  max←∊⌈/widths←⍴¨data←(⊂acct_no) ctrgl_chk_book_line ¨ doc_list
+  data←⊃{max↑⍵}¨data
 ∇
 
 ∇ ln←acct_no ctrgl_chk_book_line chk;head;body;cash_line;dist_lines;bv
@@ -128,14 +129,16 @@
   data[ix;7]←+\-/data[ix;5 6]
 ∇
 
-∇doc←hd ctrgl_chk_je ln;co;pd;jr;acct;nm;desc;dist;ct;sink
+∇doc←cb ctrgl_chk_je ix;ln;co;pd;jr;acct;dt;nm;desc;dist;ct;sink
  ⍝ Function to prepare a document (in general journal form) from a row
  ⍝ in a check book. Left argument hd is a vector of company, period,
- ⍝ journal, and checkbook account number.
- co←1⊃hd ◊ pd←2⊃hd ◊ jr←3⊃hd ◊ acct←4⊃hd
+ ⍝ journal, and checkbook account number. The right is the target line.
+  co←cb lex∆lookup 'company' ◊ pd←cb lex∆lookup 'period'
+  jr←cb lex∆lookup 'journal' ◊ acct←cb lex∆lookup 'acct_no'
+  ln←(cb lex∆lookup 'Data')[ix;]
  dt←1⊃ln ◊ nm←3⊃ln ◊ desc←4⊃ln
  doc←ctrgl_doc_init co jr nm dt desc pd
- dist←((+/utl∆stringp ¨ dist),2)⍴dist←8↓ln
+ dist←((+/utl∆numberp ¨ dist),2)⍴dist←8↓ln
  dist←0,(⍳1↑⍴dist),dist[;1],0⌈dist[;2]∘.×1 ¯1
  dist←dist,[1]0,(1+⌈/dist[;2]),(⊂acct),0⌈1 ¯1×+/-/dist[;5 4]
  sink←{doc←doc ctrgl_doc_newLine ⍵}¨⊂[2]dist

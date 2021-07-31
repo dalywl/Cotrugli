@@ -1,13 +1,13 @@
 COTRUGLI
 ========
 
-Today Cotrugli is an application program intgerface to a general
+Today Cotrugli is an application program interface to a general
 ledger written in APL (https://www.gnu.org/software/apl/).
 
-Cotrugli uses postgresql to store its data and uses APL Library
+Cotrugli uses PostgreSQL to store its data and uses APL Library
 (https://sourceforge.net/projects/apl-library/).
 
-Tommorrow Cotrugli will become a full fledge accounting software.  You
+Tomorrow Cotrugli will become a full fledged accounting software.  You
 are invited to join the development effort.
 
 Our plan is:
@@ -16,3 +16,10 @@ Our plan is:
     a check book journal
  2. Develop Financial Statements prepared from the general ledger.
  3. Develop a graphical user interface.
+
+Be sure to read the documentation files (directory doc).  GL_API.muse
+describes the application program interface and setup.muse has
+directions on how to setup the database and to start entering
+transactions.
+
+

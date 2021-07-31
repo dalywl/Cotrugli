@@ -146,7 +146,7 @@
 
 ∇data←handle ctrgl_sql_periods co;cmd
   ⍝ Function returns an array of the periods defined for a company
-  cmd←'SELECT period, begin_date, end_date FROM periods WHERE company = ''',co,''' '
+  cmd←'SELECT period, begin_date, end_date, year_end FROM periods WHERE company = ''',co,''' '
   cmd←cmd,'ORDER BY period'
   data←cmd SQL∆Select[handle] ''
 ∇
@@ -220,7 +220,7 @@ replace:
   ⍝ Function preparse a workpaper showing the periods defined for a company.
   wp←wp∆init co,'-PD'
   wp←wp wp∆setHeading co 'Periods' ''
-  wp←wp wp∆setData 'Period' 'Begin' 'End',[1]handle ctrgl_sql_periods co
+  wp←wp wp∆setData 'Period' 'Begin' 'End' 'y/e',[1]handle ctrgl_sql_periods co
   wp←wp wp∆setStylesheet ctrgl_default_css
   wp←wp wp∆setAuthor 'cotrugli'
 ∇
@@ -306,40 +306,65 @@ replace:
 ⍝ Maintain the period table
 ⍝ ********************************************************************
 
-∇ msg←cth ctrgl_period_post_editchecks pd;co;name;begin;end;dtest;bv
+∇ msg←cth ctrgl_period_post_editchecks pd;co;name;begin;end;ye;dtest;bv
   ⍝ Function to post a period to the database.
-  (co name begin end)←pd
+  (co name begin end ye)←pd
   msg←''
   ⍎(~cth ctrgl_check_company co)/'msg←''',co,' is not defined.'' ◊ →0'
   ⍎(~utl∆stringp name)/'msg←''The period name must be a character string. ◊ →0'''
   dtest←(⊂date∆US) date∆parse ¨ begin end
   ⍎(∨/bv)/'msg←',((bv←utl∆stringp ¨ dtest)/dtest),' is not a date ◊ →0'
-  ⍎(~</date∆lillian ¨ dtest)/'msg←The begining data must be less than the ending ◊ →0'
+  ⍎(~</date∆lillian ¨ dtest)/'msg←''The begining data must be less than the ending'' ◊ →0'
+  ⍎(~utl∆numberp ye)/'msg←''Year-end is either true (1) or false (0).'' ◊ →0'
+  ⍎(∧/1 0 ≠ ye←''⍴ye)/'msg←''Year-end is either true (1) or false (0).'' ◊ →0'
 ∇
 
-∇handle ctrgl_period_post pd;cmd;name
+∇handle ctrgl_period_post pd;cmd;name;ye
   ⍝ Function fo post a period.  A period is the company, name, begining
-  ⍝ date, and the ending date.
+  ⍝ date, ending date and year end flag.
   utl∆es cth ctrgl_period_post_editchecks pd
+  ye←'FT'[⎕io+5⊃pd]		⍝ Convert APL boolean to SQL boolean
   cmd←'SELECT period FROM periods WHERE company = ? and period = ?'
   →(0≠1↑⍴name←cmd SQL∆Select[handle] pd[1 2])/replace
 insert:
-  cmd←'INSERT INTO periods (company, period, begin_date, end_date) VALUES ('
+  cmd←'INSERT INTO periods (company, period, begin_date, end_date, year_end) VALUES ('
   cmd←cmd,'''',(1⊃pd),''','
   cmd←cmd,'''',(2⊃pd),''','
   cmd←cmd,'''',(3⊃pd),''','
-  cmd←cmd,'''',(4⊃pd),''')'
+  cmd←cmd,'''',ye,''','
+  cmd←cmd,'''',(5⊃pd),''')'
   cmd SQL∆Exec[handle] ''
   →0
 replace:
-  cmd←'UPDATE periods set begin_date = ''',(3⊃pd),''', end_date = '''
-  cmd←cmd,(4⊃pd),''' WHERE company = ''',(1⊃pd),''' and period = '''
+  cmd←'UPDATE periods set begin_date = ''',(3⊃pd)
+  cmd←cmd,''', end_date = ''',(4⊃pd),''', year_end = ''',ye
+  cmd←cmd,''' WHERE company = ''',(1⊃pd),''' and period = '''
   cmd←cmd,(2⊃pd),''''
-  cmd SSQL∆Exec[handle] ''
+  cmd SQL∆Exec[handle] ''
   →0
 ∇
   
-⍝ ********************************************************************
+∇last←handle ctrgl_period_prev args;co;pd;cmd;rs;begin
+  ⍝ Function returns the previous period for the company, period
+  ⍝ provided. The right argument is the company and period
+  (co pd)←args
+  cmd←'SELECT begin_date FROM periods WHERE company = ? and period = ?'
+  rs←,⊃cmd SQL∆Select[handle] co pd
+  begin←¯1 + date∆lillian date∆US date∆parse rs
+  begin←date∆US date∆fmt∆3numbers date∆unlillian begin
+  cmd←'SELECT period FROM periods where company = ? and end_date = ?'
+  last←,⊃cmd SQL∆Select[handle] co begin
+∇
+
+∇b←handle ctrgl_period_yep args;co;pd;cmd
+  ⍝ Function returns true if the period is the last in a fiscal
+  ⍝ year. The right argument  is a vector of company and period.
+  (co pd)←args
+  cmd←'SELECT year_end from periods where company = ? and period = ?'
+  b←'t'=''⍴⊃cmd SQL∆Select[handle] co pd
+∇
+
+⍝ *******************************************************************
 ⍝ Maintain the journal table
 ⍝ ********************************************************************
 
@@ -640,6 +665,51 @@ cm:
 ∇
 
 ⍝ ********************************************************************
+⍝ Begining balance functions
+⍝ ********************************************************************
+
+∇bb←ctrgl_bb_config handle;cmd;rs;i
+  ⍝ Function returns information about beging balance entries from the
+  ⍝ config table.
+  cmd←'SELECT trim(name),value from config where name like ''begin%'' order by name'
+  rs←cmd SQL∆Select[handle] ''
+  bb←lex∆from_alist ,rs
+∇
+
+∇date←handle ctrgl_bb_date arg;co;pd;cmd
+  ⍝ Function returns the date of a begining balance entry.
+  (co pd)←arg
+  cmd←'SELECT begin_date from periods where company = ? and period = ?'
+  date←,⊃cmd SQL∆Select[handle] co pd
+∇
+
+
+∇doc←handle ctrgl_bb_doc arg;co;pd;pv;cmd;blex;tb;dt;re_bal
+  ⍝ Function returns the begining balalnce entry for a period.
+  (co pd)←arg
+  pv←handle ctrgl_period_prev co pd
+  blex←ctrgl_bb_config handle
+  dt←handle ctrgl_bb_date co pd
+  tb←handle ctrgl_sql_tb co pv
+  doc←ctrgl_doc_init (⊂co),(⊂blex lex∆lookup 'begin_journal'),(⊂blex lex∆lookup 'begin_document'),(⊂dt),(⊂blex lex∆lookup 'begin_desc'),⊂pd
+  →(handle ctrgl_period_yep co pv)/bs_only
+full_tb:
+  doc[2]←⊂0,(⍳1↑⍴tb),tb[;1 3 4]
+  →0
+bs_only:
+  tb←(∊'i' ≠ ¨ tb[;5])⌿tb
+  re_bal←-/+⌿(∊'b'=¨tb[;5])⌿tb[;3 4]
+  →(re_bal<0)/deficit
+  tb[(∊'r'=¨tb[;5])/⍳1↑⍴tb;3 4]←0 re_bal
+  →end
+deficit:
+  tb[(∊'r'=¨tb[;5])/⍳1↑⍴tb;3 4]←(-re_bal),0
+  →end
+end:
+  doc[2]←⊂0,(⍳1↑⍴tb),tb[;1 3 4]
+∇  
+
+⍝ ********************************************************************
 ⍝ Other stuff
 ⍝ ********************************************************************
 
@@ -694,3 +764,4 @@ cm:
   r8←r8 wp∆ssc∆assignProp 'border-top' 'solid 1px black'
   ss←ss wp∆ss∆assignClass r8
 ∇
+
