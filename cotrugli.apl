@@ -331,8 +331,8 @@ insert:
   cmd←cmd,'''',(1⊃pd),''','
   cmd←cmd,'''',(2⊃pd),''','
   cmd←cmd,'''',(3⊃pd),''','
-  cmd←cmd,'''',ye,''','
-  cmd←cmd,'''',(5⊃pd),''')'
+  cmd←cmd,'''',(4⊃pd),''','
+  cmd←cmd,'''',ye,''')'
   cmd SQL∆Exec[handle] ''
   →0
 replace:

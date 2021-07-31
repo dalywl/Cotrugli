@@ -28,10 +28,10 @@ cth ctrgl_config_post 'begin_journal' 'gj'
 cth ctrgl_company_post 'ex' 'Example Co. LLC'
 cth ctrgl_jrnl_post 'gj' 'General Journal'
 cth ctrgl_jrnl_post 'ck' 'Check Book'
-cth ctrgl_period_post 'ex' '2021-01' '01/01/2021' '03/31/2021'
-cth ctrgl_period_post 'ex' '2021-02' '04/01/2021' '06/30/2021'
-cth ctrgl_period_post 'ex' '2021-03' '07/01/2021' '09/30/2021'
-cth ctrgl_period_post 'ex' '2021-04' '10/01/2021' '12/31/2021'
+cth ctrgl_period_post 'ex' '2021-01' '01/01/2021' '03/31/2021' 0
+cth ctrgl_period_post 'ex' '2021-02' '04/01/2021' '06/30/2021' 0
+cth ctrgl_period_post 'ex' '2021-03' '07/01/2021' '09/30/2021' 0
+cth ctrgl_period_post 'ex' '2021-04' '10/01/2021' '12/31/2021' 1
 
 
 cth ctrgl_chart_post 'ex' '3100' 'Common Stock' 'b' 'c'
