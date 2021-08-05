@@ -19,7 +19,7 @@
 ⍝ ********************************************************************
 ⍝ Setup config table.
 cth ctrgl_config_post 'accountFormat' '0000'
-cth ctrgl_config_post 'balanceFormat' '555,555,510'
+cth ctrgl_config_post 'balanceFormat' '555,555,510.00'
 cth ctrgl_config_post 'begin_desc'     'Begining trial balance.'
 cth ctrgl_config_post 'begin_document' 'BEG_BAL'
 cth ctrgl_config_post 'begin_journal' 'gj'
