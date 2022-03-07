@@ -80,6 +80,16 @@
   SQL∆Rollback handle
 ∇
 
+∇rs←ctrgl_sql_escape_quotes txt;loc
+  ⍝ Function returns the text with single quotes escaped for
+  ⍝ postgresql
+  rs←txt
+  →(∧/~txt='''')/0		⍝ Nothing to do
+  loc←+/1,∧\''''≠txt
+  rs←(loc↑rs),'''',ctrgl_sql_escape_quotes loc↓txt
+∇
+
+
 ∇data←ctrgl_sql_company handle;cmd
   ⍝ Function returns the company table
   cmd←'SELECT company,coname FROM company ORDER BY company'
@@ -180,8 +190,8 @@
 ∇ handle ctrgl_config_post args;cmd;name;value;rs
   ⍝ Function to post a name -- value pair to the config table.
   name←1⊃args ◊ value←2⊃args
-  cmd←'SELECT trim(name) FROM config WHERE name = ?'
-  →(1=1↑⍴rs←cmd SQL∆Select[handle] ⊂name)/replace
+  cmd←'SELECT EXISTS(SELECT trim(name) FROM config WHERE name = ''',name,''')'
+  →('t'=''⍴⊃rs←cmd SQL∆Select[handle] '')/replace
 insert:
   cmd←'INSERT INTO config (name,value) VALUES (?,?)'
   cmd SQL∆Exec[handle] name value
@@ -322,7 +332,7 @@ replace:
 ∇handle ctrgl_period_post pd;cmd;name;ye
   ⍝ Function fo post a period.  A period is the company, name, begining
   ⍝ date, ending date and year end flag.
-  utl∆es cth ctrgl_period_post_editchecks pd
+  utl∆es handle ctrgl_period_post_editchecks pd
   ye←'FT'[⎕io+5⊃pd]		⍝ Convert APL boolean to SQL boolean
   cmd←'SELECT period FROM periods WHERE company = ? and period = ?'
   →(0≠1↑⍴name←cmd SQL∆Select[handle] pd[1 2])/replace
@@ -581,7 +591,7 @@ head←1⊃doc ◊ body←2⊃doc ◊ co ← 2⊃head
 msg←''
 ⍝ Column 3 is account numbers
 cmd←'SELECT acct_no FROM accounts where company = ? and acct_no = ?'
-rs←{⍬⍴cmd SQL∆Select[cth] ⍵}¨⊂[2](⊂co),[1.1]body[;3]
+rs←{⍬⍴cmd SQL∆Select[handle] ⍵}¨⊂[2](⊂co),[1.1]body[;3]
 ⍝ rs←cmd SQL∆Select[handle] (⊂co),[1.1]body[;3]
 →(∧/rs←utl∆stringp ¨ rs)/m1
 msg←(,⍕(~rs)/body[;3]),' not in chart of accounts.'
@@ -591,7 +601,7 @@ m1:
 msg←(,⍕rs/,body[;4 5]),' are not numbers.'
 →0
 m2:
-→(0=-/+⌿body[;4 5])/0
+→(0=¯2 utl∆round -/+⌿body[;4 5])/0
 msg←'The debits do not equal the credits.'
 →0
 ∇
@@ -635,6 +645,7 @@ msg←'The debits do not equal the credits.'
   utl∆es handle ctrgl_doc_post_checkHead head
   utl∆es ¨ handle ctrgl_doc_post_checkBody head body
   head[1] ← handle ctrgl_check_doc head[2 3 4 7]
+  head[6]←ctrgl_sql_escape_quotes head[6]
   SQL∆Begin handle
   →(head[1]≠0)/replace
 insert:

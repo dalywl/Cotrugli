@@ -1,6 +1,6 @@
 #! /usr/local/bin/apl --script
 ⍝ ********************************************************************
-⍝ test-squite01.apl Workspace to test cotrugli
+⍝ test_squite01.apl Workspace to test cotrugli
 ⍝ Copyright (C) 2021 Bill Daly
 
 ⍝ This program is free software: you can redistribute it and/or modify
@@ -23,22 +23,22 @@
 
 ∇b←handle ts_db_exists name;cmd
   ⍝ Function test existance of a database
-  cmd←'select exists(select datname from pg_catalog.pg_database where datname = '''
-  ,name,''')'
+  cmd←'select exists(select datname from pg_catalog.pg_database where datname = ''' ,name,''')'
   b←'t'=''⍴⊃cmd SQL∆Select[handle] ''
 ∇
 
 ∇ handle ts_db_create dbname
   ⍝ Function creates a new database
-  ('CREATE DATABASE ',dbanme) SQL∆Execute[handle] ''
+  ('CREATE DATABASE ',dbname) SQL∆Exec[handle] ''
 ∇
 
-∇ ts_db_schema fname;schema;dbh
+∇ dbname ts_db_schema fname;schema;dbh
   ⍝ Functions creates database tables, views and functions
   schema← utf8∆read fname
-  dbh←'w' FIO∆popen 'psql --host=localhost --username=dalyw --password=pe37lucM --dbname=test01'
+  schema←schema,⎕tc[3],'\q'
+  dbh←'w' FIO∆popen 'psql --host=localhost --username=dalyw --dbname=',dbname
   (⎕ucs schema) FIO∆fwrite dbh
-  FIO∆pcloe dbh
+  FIO∆pclose dbh
 ∇
 
 ∇ ts_build_config handle
@@ -120,22 +120,21 @@
 ∇
 
 ∇ schema main dbname;dbh
-  →(~ts_db_exists('test01')/BuildDB
+  dbh←'postgresql' SQL∆Connect 'host=localhost user=dalyw dbname=dalyw password=1BBmXEc0'
   ⍝ Remove last test results from postgres
-  dbh←'postgresql' SQL∆Connect 'host=localhost user=dalyw dbname=dalyw password=pe37lucM'
-  ('DROP DATABASE ',dbname) SQL∆Execute[dbh] ''
-  SQL∆Disconnect dbh
+  →(~dbh ts_db_exists 'test01')/BuildDB
+  ('DROP DATABASE ',dbname) SQL∆Exec[dbh] ''
 BuildDB:
   ⍝ Create and poplate a new database
-  dbh←'postgresql' SQL∆Connect 'host=localhost user=dalyw dbname=dalyw password=pe37lucM'
-  dbh ts_db_create(dbname)
+  dbh ts_db_create dbname
   SQL∆Disconnect dbh
-  ts_db_schema(schema)
-  ts_build_config(dbh)
-  ts_build_company(dbh)
-  ts_build_journal(dbh)
-  ts_build_period(dbh)
-  ts_build_accounts(dbh)
-  ts_build_begin(dbh)
+  dbname ts_db_schema schema
+  dbh←'postgresql' SQL∆Connect 'host=localhost user=dalyw dbname=',dbname,' password=1BBmXEc0'
+  ts_build_config dbh
+  ts_build_company dbh
+  ts_build_journal dbh
+  ts_build_period dbh
+  ts_build_accounts dbh
+  ts_build_begin dbh
 ∇
 
