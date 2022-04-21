@@ -21,6 +21,7 @@
 )copy 5 SQL
 )copy 1 wp
 )copy 1 date
+)copy 1 cl
 
 ⍝ ********************************************************************
 ⍝ Integrity checking
@@ -35,6 +36,7 @@
 ∇b←handle ctrgl_check_account args;co;acct;cmd
   ⍝ Function confirms an acct is defined in the accounts table.The
   ⍝ right argument is the company and account number.
+  →(~b←∧/∊utl∆stringp ¨ args)/0	⍝ accounts as numbers not acceptable. 
   cmd←'SELECT acct_no from accounts where company = ? and acct_no = ?'
   b←0≠1↑⍴cmd SQL∆Select[handle] args
 ∇
@@ -166,6 +168,22 @@
   cmd←'SELECT jrnl, title FROM journal order by jrnl'
   data←cmd SQL∆Select[handle] ''
 ∇
+
+∇doc←handle ctrgl_sql_doc args;co;pd;jl;nm;hd;bd;cmd;doc_id
+  ⍝ Function returns a document. The right argument is company,
+  ⍝ period, journal, and name.
+  co←1⊃args ◊ pd←2⊃args ◊ jl←3⊃args ◊ nm← 4⊃args
+  cmd←"SELECT doc_id, doc_date, description from document where company = ? and period = ? and journal = ? and name = ?"
+  ⍝ Head is doc_id, company, journal, name, date, description, and period.
+  hd←cmd SQL∆Select[handle] co pd jl nm
+  hd←1 0 0 0 1 1 0 \,hd
+  hd[2]←⊂co ◊ hd[3]←⊂jl ◊ hd[4]←⊂nm ◊ hd[7]←⊂pd
+  cmd←"SELECT doc_id, line_no, acct_no, debit, credit from doc_lines where doc_id = ?"
+  bd←cmd SQL∆Select[handle] 1⊃hd
+  doc←hd bd
+∇
+  
+  
 
 ⍝ ********************************************************************
 ⍝ Function to build workpaper attributes
@@ -312,6 +330,7 @@ replace:
   cmd SQL∆Exec[cth] name co
   →0
 ∇
+
 ⍝ ********************************************************************
 ⍝ Maintain the period table
 ⍝ ********************************************************************
@@ -353,17 +372,41 @@ replace:
   cmd SQL∆Exec[handle] ''
   →0
 ∇
-  
+
+∇ begin←handle ctrgl_period_begin args;co;pd
+  ⍝ Function returns the date a period begins
+  (co pd)←args
+  cmd←'SELECT begin_date FROM periods WHERE company = ? and period = ?'
+  begin←,⊃cmd SQL∆Select[handle] co pd
+∇
+
+∇ end←handle ctrgl_period_end args;co;pd
+  ⍝ Functionreturns the date a period ends
+  (co pd)←args
+  cmd←'SELECT end_date FROM periods WHERE company = ? and period = ?'
+  end←,⊃cmd SQL∆Select[handle] co pd
+∇
+
 ∇last←handle ctrgl_period_prev args;co;pd;cmd;rs;begin
   ⍝ Function returns the previous period for the company, period
   ⍝ provided. The right argument is the company and period
   (co pd)←args
-  cmd←'SELECT begin_date FROM periods WHERE company = ? and period = ?'
-  rs←,⊃cmd SQL∆Select[handle] co pd
+  rs←handle ctrgl_period_begin co pd
   begin←¯1 + date∆lillian date∆US date∆parse rs
   begin←date∆US date∆fmt∆3numbers date∆unlillian begin
   cmd←'SELECT period FROM periods where company = ? and end_date = ?'
   last←,⊃cmd SQL∆Select[handle] co begin
+∇
+
+∇next←handle ctrgl_period_next args;co;pd;cmd;raw;begin
+  ⍝ Function returns the next period of a company. rarg is company,
+  ⍝ period.
+  (co pd)←args
+  raw←handle ctrgl_period_end co pd
+  begin←1 + date∆lillian date∆US date∆parse raw
+  begin←date∆US date∆fmt∆3numbers date∆unlillian begin
+  cmd←'SELECT period FROM periods WHERE company = ? and begin_date = ?'
+  next←,⊃cmd SQL∆Select[handle] co begin
 ∇
 
 ∇b←handle ctrgl_period_yep args;co;pd;cmd
@@ -373,6 +416,7 @@ replace:
   cmd←'SELECT year_end from periods where company = ? and period = ?'
   b←'t'=''⍴⊃cmd SQL∆Select[handle] co pd
 ∇
+
 
 ⍝ *******************************************************************
 ⍝ Maintain the journal table
@@ -449,6 +493,11 @@ replace:
 
 ⍝ ********************************************************************
 ⍝ Functions about a document
+⍝ A document is the basic unit of input and consists of a head and a
+⍝ body. The head is a vector of doc_id, company, journal, name, date,
+⍝ description, and period. A body is an array of account number, debit
+⍝ and credit.  There must be at least two lines, and the total debits
+⍝ must equal the total credits.
 ⍝ ********************************************************************
 
 ∇msg←ctrgl_doc_init_editchecks args
@@ -459,7 +508,7 @@ replace:
   msg←'Length error argument must be a six item vector of company,',⎕tc[3]
   msg←msg,'journal, name, date, description and period.'
   →0
-  more:⍎(~utl∆stringp 1⊃args)/'msg←''The company must be a string of characters.'' ◊ →0'
+more:⍎(~utl∆stringp 1⊃args)/'msg←''The company must be a string of characters.'' ◊ →0'
   ⍎(~utl∆stringp 2⊃args)/'msg←''The journal must be a string of characters.'' ◊ →0'
   ⍎(~utl∆stringp 3⊃args)/'msg←''The document name must be a string of characters.'' ◊ →0'
 ∇
@@ -532,12 +581,12 @@ end:
   ⍝ Function to delete a line from a document.
   (head lines)←old
   utl∆es lines ctrgl_doc_delLine_editchecks acct
-  doc←(⊂head),⊂(lines[;3]≠acct)⌿lines
+  doc←(⊂head),⊂(~∊{acct utl∆stringEquals ⍵}¨lines[;3])⌿lines
 ∇
 
 ∇wp_head←cfg ctrgl_doc_wp_head doc
-⍝ Function returns the heading for the document report
-wp_head←(1⊃doc)[2],meta_doc[4],⊂'Period ',5⊃meta_doc
+  ⍝ Function returns the heading for the document report
+  wp_head←(1⊃doc)[2],meta_doc[4],⊂'Period ',5⊃meta_doc
 ∇
 
 ∇dat←handle ctrgl_doc_wp_dat doc;co;lines;cmd
@@ -549,7 +598,15 @@ wp_head←(1⊃doc)[2],meta_doc[4],⊂'Period ',5⊃meta_doc
   ⍝dat←accounts[{accounts[;1] utl∆listSearch ⍵}¨lines[;3];1 2],lines[;4 5]
   dat←dat,[1](⊂''),(⊂'Total'),+⌿lines[;4 5]
 ∇
- 
+
+∇list←handle ctrgl_doc_list args;hd;bd
+  ⍝ Function creates a list of documents from a list of document
+  ⍝ headings and a list of document bodies.  The right argment is
+  ⍝ headings bodies.
+  hd←⊂[2]1⊃args ◊ bd←2⊃args
+  list←hd{(⊂⍺),⊂⍵}¨bd
+∇
+
 ∇wp←handle ctrgl_doc_workpaper doc;aix;meta_doc;lines;attr;dat;config;accounts
   ⍝ Function returns a workpaper displaying a document
   config←ctrgl_sql_config handle 
@@ -586,24 +643,24 @@ wp_head←(1⊃doc)[2],meta_doc[4],⊂'Period ',5⊃meta_doc
 ∇
 
 ∇msg←handle  ctrgl_doc_post_checkBody doc;cmd;head;body;co;rs
-⍝ Function confirms the body of a document can be posted.
-head←1⊃doc ◊ body←2⊃doc ◊ co ← 2⊃head
-msg←''
-⍝ Column 3 is account numbers
-cmd←'SELECT acct_no FROM accounts where company = ? and acct_no = ?'
-rs←{⍬⍴cmd SQL∆Select[handle] ⍵}¨⊂[2](⊂co),[1.1]body[;3]
-⍝ rs←cmd SQL∆Select[handle] (⊂co),[1.1]body[;3]
-→(∧/rs←utl∆stringp ¨ rs)/m1
-msg←(,⍕(~rs)/body[;3]),' not in chart of accounts.'
-→0
+  ⍝ Function confirms the body of a document can be posted.
+  head←1⊃doc ◊ body←2⊃doc ◊ co ← 2⊃head
+  msg←''
+  ⍝ Column 3 is account numbers
+  cmd←'SELECT acct_no FROM accounts where company = ? and acct_no = ?'
+  rs←{⍬⍴cmd SQL∆Select[handle] ⍵}¨⊂[2](⊂co),[1.1]body[;3]
+  ⍝ rs←cmd SQL∆Select[handle] (⊂co),[1.1]body[;3]
+  →(∧/rs←utl∆stringp ¨ rs)/m1
+  msg←(,⍕(~rs)/body[;3]),' not in chart of accounts.'
+  →0
 m1:
-→(∧/rs←utl∆numberp ¨,body[;4 5])/m2
-msg←(,⍕rs/,body[;4 5]),' are not numbers.'
-→0
+  →(∧/rs←utl∆numberp ¨,body[;4 5])/m2
+  msg←(,⍕rs/,body[;4 5]),' are not numbers.'
+  →0
 m2:
-→(0=¯2 utl∆round -/+⌿body[;4 5])/0
-msg←'The debits do not equal the credits.'
-→0
+  →(0=¯2 utl∆round -/+⌿body[;4 5])/0
+  msg←'The debits do not equal the credits.'
+  →0
 ∇
 
 ∇handle ctrgl_doc_insert doc;head;body;cmd
@@ -645,7 +702,7 @@ msg←'The debits do not equal the credits.'
   utl∆es handle ctrgl_doc_post_checkHead head
   utl∆es ¨ handle ctrgl_doc_post_checkBody head body
   head[1] ← handle ctrgl_check_doc head[2 3 4 7]
-  head[6]←ctrgl_sql_escape_quotes head[6]
+  head[6]←⊂ctrgl_sql_escape_quotes 6⊃head
   SQL∆Begin handle
   →(head[1]≠0)/replace
 insert:
@@ -671,8 +728,8 @@ cm:
 
 ∇rpt←handle ctrgl_doc_show doc
   ⍝ Function to display an document in general journal form
- utl∆es handle ctrgl_doc_show_editchecks doc
- rpt←wp∆txt∆assemble handle ctrgl_doc_workpaper doc
+  utl∆es handle ctrgl_doc_show_editchecks doc
+  rpt←wp∆txt∆assemble handle ctrgl_doc_workpaper doc
 ∇
 
 ⍝ ********************************************************************
@@ -719,6 +776,220 @@ deficit:
 end:
   doc[2]←⊂0,(⍳1↑⍴tb),tb[;1 3 4]
 ∇  
+
+⍝ ********************************************************************
+⍝ Accounts
+⍝ ********************************************************************
+∇ balance←handle ctrgl_acct_balance args;co;pd;acct;cmd
+  ⍝ Function returns the posted balance of an account where debits are
+  ⍝ positive and credits negative.  The right argument is company,
+  ⍝ period, and account number.
+  cmd←'select dr - cr from tb where co = ? and period = ? and acct = ?'
+  balance←1⊃,cmd SQL∆Select[handle] args
+∇
+
+∇ balance←handle ctrgl_acct_begin args;cmd
+  ⍝ Function returns the posted beginingf balance of an account where
+  ⍝ debits are positive and credits negative.  The right argument is
+  ⍝ company, period and account number.
+  cmd←'select debit - credit from begining_trans where company = ? and period = ? and acct_no = ?'
+  balance←1⊃,cmd SQL∆Select[handle] args
+∇
+
+
+⍝ ********************************************************************
+⍝ Checkbooks
+⍝ ********************************************************************
+∇ hd←handle ctrgl_chk_heads args;company;period;jrnl;cmd
+  ⍝ Function returns a vector of document headings. The right argument
+  ⍝ is an array of company code, period, and journal.
+  company←1⊃args ◊ period←2⊃args ◊ jrnl←3⊃args
+  cmd←'SELECT doc_id, trim(company), trim(journal), trim(name), doc_date, description, period,''p'' FROM document WHERE company = ? and period = ? and journal = ?'
+  hd←cmd SQL∆Select[handle] company period jrnl
+∇
+
+∇ bd←handle ctrgl_chk_bodies doc_ids;cmd
+  ⍝ Function returns a vector of document bodies.  The right argument
+  ⍝ is a vector of doc_ids.
+  cmd←'SELECT doc_id, line_no, trim(acct_no), debit, credit from doc_lines WHERE doc_id = ? order by line_no'
+  bd←{cmd SQL∆Select[handle] ⍵}¨ doc_ids
+∇
+
+∇rs←chkbook ctrgl_chk_name lnno;data
+  ⍝ Function returns the document name for the given line number
+  data←wp∆getData chkbook
+  utl∆es (~utl∆integerp lnno)/(⍕lnno),' is not an integer.'
+  utl∆es (lnno > 1↑⍴data)/(⍕lnno),' is greater than the number of lines in this checkbook.'
+  rs←data[lnno;3]
+∇
+
+∇ attr←handle ctrgl_chk_attr data;shape;bfmt;afmt;cmd;dx;bcols;acols
+  ⍝ Function assembles an array of attributes for the checkbook
+  cmd←'SELECT value from config where name = ''balanceFormat'''
+  bfmt←1⊃,cmd SQL∆Select[handle] ''
+  cmd←'SELECT value from config where name = ''accountFormat'''
+  afmt←1⊃,cmd SQL∆Select[handle] ''
+  attr←(shape←⍴data)⍴⊂lex∆init
+  acols←7+2×⍳.5×shape[2]-8
+  bcols←5 6 7,1+acols
+  attr[dx←1↓⍳shape[1];bcols]←⊂((lex∆init) lex∆assign 'format' bfmt)lex∆assign 'class' 'number'
+  attr[dx;acols]←⊂((lex∆init) lex∆assign 'format' afmt)lex∆assign 'class' 'number'
+∇
+
+∇chk_book←handle ctrgl_checkbook args;company;period;jrnl;acct_no;hd;bd;data;coname;width
+  ⍝ Function returns a checkbook, or rather check workpaper. The right
+  ⍝ argument is a vector of company code, period, account, and journal
+  ⍝ number.  The workpaper lexicon (see workspace wp) has additional
+  ⍝ keys company, period, journal, and acct_no.
+  company←1⊃args ◊ period←2⊃args ◊ acct_no ← 3⊃ args ◊ jrnl←4⊃args 
+  chk_book ← cth ctrgl_checkbook_init company period acct_no jrnl 
+  hd←handle ctrgl_chk_heads company period jrnl
+  bd←handle ctrgl_chk_bodies hd[;1]
+  data←acct_no ctrgl_checkbook_data handle ctrgl_doc_list hd bd
+  data←((width←(¯1↑⍴data))↑handle ctrgl_checkbook_begin company period acct_no),[1]data
+  data[;7]←+\-/data[;5 6]
+  data←(width↑ctrgl_chk_cols),[1]data
+  chk_book←chk_book wp∆setData data
+  chk_book←chk_book wp∆setAttributes handle ctrgl_chk_attr data
+  chk_book←chk_book wp∆setStylesheet wp∆defaultSS
+∇
+
+∇ chk_book←old ctrgl_checkbook_convert_wp args;company;period;acct_no;jrnl
+  ⍝ Function converts a work paper to a checkbook The right argument is
+  ⍝ a vector of company, period, account number, and jrnl.
+  company ← 1⊃args ◊ period ← 2⊃args ◊ acct_no ← 3⊃args ◊ jrnl ← 4⊃args
+  chk_book ← old lex∆assign 'company' company
+  chk_book ← chk_book lex∆assign 'period' period
+  chk_book ← chk_book lex∆assign 'acct_no' acct_no
+  chk_book ← chk_book lex∆assign 'journal' jrnl
+∇
+
+∇chk_book←cth ctrgl_checkbook_init args;company;period;jrnl;acct_no;coname;dat;shape
+  ⍝ Function returns a new check book instance.  The right argument is
+  ⍝ a vector of company, period, account number, and jrnl.
+  company ← 1⊃ args ◊ period ← 2⊃ args ◊ acct_no←3⊃args ◊ jrnl←4⊃args
+  chk_book ← wp∆init 'ChkBook',acct_no
+  chk_book ← chk_book ctrgl_checkbook_convert_wp args
+  dat←(shape←¯2↑1 1,⍴ctrgl_chk_cols)⍴ctrgl_chk_cols
+  dat←dat,[1]shape[2]↑cth ctrgl_checkbook_begin company period acct_no
+  chk_book ← chk_book wp∆setData dat
+  coname←cth ctrgl_companyName company
+  chk_book←chk_book wp∆setHeading coname 'Checkbook' period
+  chk_book←chk_book wp∆setAuthor 'Cotgrugli'
+∇
+
+∇ln←handle ctrgl_checkbook_begin args;co;pd;acct;cmd;name
+  ⍝ Function returns a check book line with the begining balance. The
+  ⍝ right argument is company, period, and acct number.
+  cmd ← 'SELECT value FROM config WHERE name = ''begin_document'''
+  args←args,,cmd SQL∆Select[handle] ''
+  cmd ← 'SELECT doc_date, doc, description, debit, credit, ''p'' FROM acct_detail '
+  cmd ← cmd,' WHERE company = ? and period = ? and acct_no = ? and doc = ?'
+  utl∆es (0=⍴ln←,cmd SQL∆Select[handle] args)/'Begining balance not available.'
+  ln←1 0 1 1 1 1 0 1\ln
+∇  
+
+∇data←acct_no ctrgl_checkbook_data doc_list;widths;max
+  ⍝ Function creates a checkbook array from a list of documents
+  max←∊⌈/widths←⍴¨data←(⊂acct_no) ctrgl_checkbook_line ¨ doc_list
+  data←⊃{max↑⍵}¨data
+∇
+
+∇ ln←acct_no ctrgl_checkbook_line chk;head;body;cash_line;dist_lines;bv
+  ⍝ Function returns a checkbook line from a check document.
+  head←1⊃chk ◊ body←2⊃chk 
+  cash_line←,(bv←(⊂acct_no) utl∆stringEquals ¨ body[;3])⌿body
+  dist_lines←(~bv)⌿body
+  ln←head[5],head[1],head[4],head[6],cash_line[4],cash_line[5],0,head[8]
+  ln←ln,,dist_lines[;3],[1.1]-/dist_lines[;4 5]
+∇
+
+∇ data←old ctrgl_checkbook_add line;ix
+  ⍝ Function adds a line to the check book.  A line consists of date, 
+  ⍝ name, description, debit to cash, credit to cash, and at least one
+  ⍝ pair of acct number, debit or (credit) amount.                    
+  line←(¯1↑⍴old)↑(1 0 1 1 1 1 0 0,(¯5+⍴line)⍴1)\line                  
+  data←old,[1]line
+  ix←1↓⍳1↑⍴data
+  data[ix;7]←+\-/data[ix;5 6]
+∇
+
+∇ b←handle ctrgl_check_ln_proof args;co;ln;dist;cr
+  ⍝ Function confirms that a checkbook line is correct.
+  co←1⊃args ◊ ln←2⊃args
+  dist←8↓ln
+  dist←(0 2 + .5 0 × ⍴ dist)⍴dist
+  b ← ∊ {handle ctrgl_check_account co ⍵}¨(utl∆numberp ¨ dist[;2])/dist[;1]
+  cr←-/ln[6 5]
+  b←b ∧ cr = +/dist[;2]
+∇
+
+∇rs←handle ctrgl_checkbook_proof cb;dist;dat;bv;cr;dr;co;shape;pd_args;ac_args;col_ix
+⍝ Function proves that the debits equal the credits in this
+⍝ checkbook.
+utl∆es (~handle ctrgl_check_company cb lex∆lookup 'company')/'The company is not properly defined'
+ac_args←{cb lex∆lookup ⍵}¨ 'company' 'acct_no'
+utl∆es (~handle ctrgl_check_account ac_args)/'The account is not properly defined.'
+pd_args←{cb lex∆lookup ⍵}¨ 'company' 'period'
+utl∆es (~handle ctrgl_check_period pd_args)/'The period is not properly defined'
+utl∆es (~handle ctrgl_check_journal cb lex∆lookup 'journal')/'The journal is not properly defined'
+dat←wp∆getData cb
+co←cb lex∆lookup 'company'
+col_ix←7+2×⍳.5×¯8+¯1↑⍴dat
+dist←dat[ix←2↓⍳1↑⍴dat;col_ix]	⍝ Line 1 col heads; line 2 begining balance
+shape←⍴dist
+bv←,⊃{handle ctrgl_check_account  co ⍵}¨,dist
+dr←+/shape⍴bv\bv/,dat[ix;1+col_ix]
+cr←-/ dat[ix;6 5]
+rs←dr=cr
+∇
+
+∇ch ctrgl_checkbook_post chk;shape;lb;i;je
+  ⍝ Function post all the transactions in a checkbook.
+  shape←⍴wp∆getData chk
+  lb←(shape[1]⍴st),ed
+  i←3				⍝ Line 1 is column heads; 2 is begining balance
+st:
+  ch ctrgl_doc_post chk ctrgl_checkbook_je i
+  →lb[i←i+1]
+ed:
+∇
+
+∇doc←cb ctrgl_checkbook_je ix;ln;co;pd;jr;acct;dt;nm;desc;dist;ct;sink
+  ⍝ Function to prepare a document (in general journal form) from a row
+  ⍝ in a check book. Left argument hd is a lexicon of company, period,
+  ⍝ journal, and checkbook account number. The right is the target line.
+  co←cb lex∆lookup 'company' ◊ pd←cb lex∆lookup 'period'
+  jr←cb lex∆lookup 'journal' ◊ acct←cb lex∆lookup 'acct_no'
+  ln←(cb lex∆lookup 'Data')[ix;]
+  dt←1⊃ln ◊ nm←3⊃ln ◊ desc←4⊃ln
+  doc←ctrgl_doc_init co jr nm dt desc pd
+  dist←((+/utl∆numberp ¨ dist),2)⍴dist←8↓ln
+  dist←0,(⍳1↑⍴dist),dist[;1],0⌈dist[;2]∘.×1 ¯1
+  dist←dist,[1]0,(1+⌈/dist[;2]),(⊂acct),0⌈1 ¯1×+/-/dist[;5 4]
+  sink←{doc←doc ctrgl_doc_newLine ⍵}¨⊂[2]dist
+∇
+⍝ ********************************************************************
+⍝ Display functions
+⍝ ********************************************************************
+
+∇wp←handle ctrgl_display_journal args;co;pd;jr;names;cmd
+  ⍝ Function to display all the entries on a journal. Right argument
+  ⍝ is company, period, and journal.
+  co←1⊃args ◊ pd←2⊃args ◊ jr←3⊃args
+  cmd←'SELECT name FROM document WHERE company = ? AND period = ? and journal = ?'
+  names←cmd SQL∆Select[handle] co pd jr
+  wp←{handle ctrgl_sql_doc co pd jr ⍵}¨,names
+  wp←⎕tc[3] utl∆join cth ctrgl_doc_show ¨ wp
+∇
+
+∇names←handle ctrgl_display_jrnl_names args;co;pd;jr;cmd
+  ⍝ Function returns a list of document names from a journal. Right
+  ⍝ argument is  company, period, and journal.
+  co←1⊃args ◊ pd←2⊃args ◊ jr←3⊃args
+  cmd←'SELECT name FROM document WHERE company = ? AND period = ? and journal = ? order by name'
+  names←cmd SQL∆Select[handle] co pd jr
+∇
 
 ⍝ ********************************************************************
 ⍝ Other stuff
@@ -776,3 +1047,23 @@ end:
   ss←ss wp∆ss∆assignClass r8
 ∇
 
+∇ coname←handle ctrgl_companyName company;cmd
+  ⍝ Function returns the company name from the database.
+  cmd←'SELECT coname FROM company WHERE company = ?'
+  coname←1⊃,cmd SQL∆Select[handle] ⊂company
+∇
+
+∇Z←ctrgl⍙metadata
+  Z←0 2⍴⍬
+  Z←Z⍪'Author'          'Bill Daly'
+  Z←Z⍪'BugEmail'        'bugs@dalywebandedit.com'
+  Z←Z⍪'Documentation'   'Info file in source code'
+  Z←Z⍪'Download'        'https://sourceforge.net/projects/cotrugli/'
+  Z←Z⍪'License'         'GPL v3'
+  Z←Z⍪'Portability'     ''
+  Z←Z⍪'Provides'        'Cotrugli application'
+  Z←Z⍪'Requires'        'APL Library'
+  Z←Z⍪'Version'         '0 0 1'
+∇
+
+ctrgl_chk_cols←'Date' 'Document' 'Name' 'Description' 'Debit' 'Credit' 'Balance' 'Posted' 'Distr.' 'Dr <Cr>'

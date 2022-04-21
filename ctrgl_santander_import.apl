@@ -19,11 +19,11 @@
 
 ⍝ ********************************************************************
 
-)copy_once 1 utl
-)copy_once 1 utf8
-)copy_once 1 date
-)copy_once 1 seq
-)copy_once 1 import
+)copy 1 utl
+)copy 1 utf8
+)copy 1 date
+)copy 1 seq
+)copy 1 import
 
 ∇rs←ctrgl∆bifurcate∆transactions tr;ix
   ⍝ Function returns the two sections of a Santander file. Section one
@@ -80,7 +80,7 @@ end:
   rs←ctrgl∆bifurcate∆transactions ⎕av[11] utl∆split utf8∆read fname
   
   rs←⊃{'ck' ctrgl∆parse∆transaction ',' utl∆split_with_quotes ⍵ } ¨ 1↓2⊃rs
-  rs←ctrgl_chk_cols,[1]((1↑⍴rs),⍴ctrgl_chk_cols)↑rs
+  rs←ctrgl_chk_cols,[1]⊖((1↑⍴rs),⍴ctrgl_chk_cols)↑rs
 ∇
 
 ∇ cbwp←cth ctrgl∆checkbook_wp args;tr;data;shape;ix
