@@ -18,10 +18,10 @@
 
 ⍝ ********************************************************************
 
-)copy 5 SQL
-)copy 1 wp
-)copy 1 date
-)copy 1 cl
+)copy_once 5 SQL
+)copy_once 1 wp
+)copy_once 1 date
+)copy_once 1 cl
 
 ⍝ ********************************************************************
 ⍝ Integrity checking
@@ -165,7 +165,7 @@
 
 ∇data←ctrgl_sql_journals handle;cmd
   ⍝ Function returns an array of the defined journals.
-  cmd←'SELECT jrnl, title FROM journal order by jrnl'
+  cmd←'SELECT jrnl, title, account FROM journal order by jrnl'
   data←cmd SQL∆Select[handle] ''
 ∇
 
@@ -257,9 +257,10 @@ replace:
   ⍝ Function preparse a workpaper showing the periods defined for a company.
   wp←wp∆init 'jrnls'
   wp←wp wp∆setHeading 'Cotrugli System' 'Journals' ''
-  wp←wp wp∆setData 'code' 'Name',[1] ctrgl_sql_journals handle
+  wp←wp wp∆setData 'code' 'Name' 'Account',[1] ctrgl_sql_journals handle
   wp←wp wp∆setStylesheet ctrgl_default_css
   wp←wp wp∆setAuthor 'cotrugli'
+  wp←wp wp∆setAttributes (⍴wp∆getData wp)⍴⊂ lex∆init
 ∇
 
 ∇wp←handle ctrgl_open_tb args;company;period;id;data;attr;ix
@@ -429,21 +430,21 @@ replace:
   ⍎(~utl∆stringp 2⊃args)/'msg←''The journal name must be a character string.'''
 ∇
 
-∇handle ctrgl_jrnl_post args;code;name;cmd;rs
+∇handle ctrgl_jrnl_post args;code;name;account;cmd;rs
   ⍝ Function to create or update a journal. The right argument is a
-  ⍝ nested vector of journal code and journal name.
+  ⍝ nested vector of journal code, journal name, and optionally, account.
   utl∆es ctrgl_jrnl_post_editCheck args
-  code←1⊃args ◊ name←2⊃args
+  code←1⊃args ◊ name←2⊃args ◊ account←3⊃args
   ⍝ Test for insertion or replacement
   cmd←'select jrnl from journal where jrnl = ?'
   →(0≠1↑rs←cmd SQL∆Select[handle] ⊂code)/replace
 insert:
-  cmd←'INSERT INTO journal (jrnl,title) VALUES (?,?)'
-  rs←cmd SQL∆Exec[handle] code name
+  cmd←'INSERT INTO journal (jrnl,title,account) VALUES (?,?,?)'
+  rs←cmd SQL∆Exec[handle] code name account
   →0
 replace:
-  cmd←'UPDATE journal set title to ? WHERE jrnl = ?'
-  rs←cmd SQL∆Exec[handle] name code
+  cmd←'UPDATE journal set title to ?, account to ? WHERE jrnl = ?'
+  rs←cmd SQL∆Exec[handle] name account code
   →0
 ∇
 

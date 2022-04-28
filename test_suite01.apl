@@ -17,9 +17,9 @@
 ⍝ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ⍝ ********************************************************************
-)copy 5 FILE_IO
-)copy 1 utf8
-)copy 2 cotrugli
+⍝ )copy 5 FILE_IO
+⍝ )copy 1 utf8
+⍝ )copy 2 cotrugli
 
 ∇b←handle ts_db_exists name;cmd
   ⍝ Function test existance of a database
@@ -57,8 +57,8 @@
 
 ∇ ts_build_journal handle
   ⍝ Function populates the journal table
-  handle ctrgl_jrnl_post 'gj' 'General Journal'
-  handle ctrgl_jrnl_post 'ck' 'Check Book'
+  handle ctrgl_jrnl_post 'gj' 'General Journal' ⍬
+  handle ctrgl_jrnl_post 'ck' 'Check Book' '1010'
 ∇
 
 ∇ ts_build_period handle
@@ -120,16 +120,16 @@
 ∇
 
 ∇ schema main dbname;dbh
-  dbh←'postgresql' SQL∆Connect 'host=localhost user=dalyw dbname=dalyw password=1BBmXEc0'
+  dbh←ctrgl_sql_connect 'localhost' 'dalyw' 'dalyw' '1BBmXEc0'
   ⍝ Remove last test results from postgres
   →(~dbh ts_db_exists 'test01')/BuildDB
   ('DROP DATABASE ',dbname) SQL∆Exec[dbh] ''
 BuildDB:
   ⍝ Create and poplate a new database
   dbh ts_db_create dbname
-  SQL∆Disconnect dbh
+  ctrgl_sql_disconnect dbh
   dbname ts_db_schema schema
-  dbh←'postgresql' SQL∆Connect 'host=localhost user=dalyw dbname=',dbname,' password=1BBmXEc0'
+  dbh←ctrgl_sql_connect 'localhost' 'dalyw' dbname '1BBmXEc0'
   ts_build_config dbh
   ts_build_company dbh
   ts_build_journal dbh

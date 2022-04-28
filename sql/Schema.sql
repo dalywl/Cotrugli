@@ -229,7 +229,8 @@ ALTER TABLE public.tb OWNER TO dalyw;
 
 CREATE TABLE journal (
     jrnl character(10) NOT NULL,
-    title character varying(255) DEFAULT NULL::character varying
+    title character varying(255) DEFAULT NULL::character varying,
+    account character(20)
 );
 
 
